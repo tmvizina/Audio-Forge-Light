@@ -30,8 +30,8 @@
     "chunk_length": 300
   },
   "tagger": {
-    "_comment": "ON by default. 'auto' = claude if ANTHROPIC_API_KEY, else codex if OPENAI_API_KEY + OPENAI_TAG_MODEL, else untagged with a printed recommendation. Tags carry the emotional cadence that makes the read sound like someone who has read the book; untagged, every chunk lands in the same flat register. This is a SECOND API bill on top of Fish. Opt out with 'none'.",
-    "engine": "auto",
+    "_comment": "ON by default with the locally authenticated Codex CLI. Use 'auto' for provider detection, 'codex' for the OpenAI API backend, or 'none' to disable delivery tags. Tags carry the emotional cadence that makes the read sound like someone who has read the book; untagged, every chunk lands in the same flat register.",
+    "engine": "codex-cli",
     "max_tag_chars": 32,
     "claude_model": "claude-opus-5",
     "effort": "low"

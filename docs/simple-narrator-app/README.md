@@ -170,8 +170,8 @@ Useful flags on any stage:
 - `--single-file` — stitch the whole book into one mp3 instead of one per chapter
 - `--ramp-up` — allow concurrency to climb back up after a run of fast, clean calls
   (off by default; see Cost and time below)
-- `--tagger auto|none|claude|codex` — delivery tags; `auto` is the default (see
-  "Emotion tags")
+- `--tagger auto|none|claude|codex|codex-cli` - delivery tags; `codex-cli` is the
+  default (see "Emotion tags")
 - `--tags-review` — stop after writing `tags.json`, before any TTS spend
 
 If you'd rather click than type, start the browser UI:
@@ -253,15 +253,21 @@ register: a death and a breakfast are delivered identically. The voice model is 
 capable of grief, urgency, and dry amusement; the tag is the only channel that tells it
 which one this passage needs.
 
-**It's on by default (`--tagger auto`).** On each run the app picks a backend from what
-your environment has:
+**It's on by default (`--tagger codex-cli`).** First sign in to the local Codex CLI:
+
+```powershell
+codex login
+```
+
+The default uses that saved CLI sign-in and does not require `OPENAI_API_KEY`:
 
 | What you have set | What happens |
 |---|---|
+| Codex CLI installed and signed in | tags via `codex exec` |
 | `ANTHROPIC_API_KEY` | tags via `claude-opus-5` |
-| `OPENAI_API_KEY` + `OPENAI_TAG_MODEL` | tags via your OpenAI account |
-| both | Anthropic wins |
-| neither | runs **untagged**, and prints how to turn it on |
+| `OPENAI_API_KEY` + `OPENAI_TAG_MODEL` | tags via the OpenAI API backend (`--tagger codex`) |
+| both with `--tagger auto` | Anthropic wins |
+| no selected backend available | runs **untagged**, and prints how to turn it on |
 
 So the app still works with nothing but a Fish key — it degrades, it doesn't fail. But it
 will tell you what you're missing, because the difference is audible.
@@ -275,6 +281,7 @@ nothing either way:
 ```powershell
 python narrate.py tag --book mybook.txt --tagger claude
 python narrate.py tag --book mybook.txt --tagger codex
+python narrate.py tag --book mybook.txt --tagger codex-cli
 ```
 
 If you use the OpenAI path, you must set `OPENAI_TAG_MODEL` yourself in `.env`. There's
@@ -286,11 +293,10 @@ Add `--tags-review` to stop right after `tags.json` is written, before any TTS c
 happen. That lets you read through the tags and hand-edit anything odd before spending
 money generating audio.
 
-**One thing to know going in, because this defaults on:** tags are a **second API bill**,
-separate from Fish Audio. It's small — one short, cached call per batch of chunks — but
-it's real, and it happens even if you never touch generation afterward. If you set an
-`ANTHROPIC_API_KEY` or `OPENAI_API_KEY` for something else, this pipeline will find it and
-use it. Run with `--tagger none` if you'd rather it didn't.
+The default CLI path uses the account already authenticated in Codex CLI rather than
+requiring an OpenAI API key. The API-backed `--tagger codex` path remains available when
+you explicitly want it. Fish Audio usage is separate. Run with `--tagger none` if you
+do not want delivery tagging.
 
 Re-tagging is cheap in the way that matters: because a chunk's identity hash covers its
 tag, changing tags regenerates **only** the chunks whose tag actually changed — not the
@@ -342,9 +348,10 @@ baseline, or immediately on any 429, 5xx, or timeout. It only climbs back up if 
 | `ffmpeg not found` | ffmpeg/ffprobe not on PATH | Install ffmpeg and confirm with `ffmpeg -version` |
 | Output sounds robotic or not like you | Reference clip too long, too noisy, or transcript mismatch | Re-record following the guidance above, or re-run `prep-ref --clean` |
 | Narrator reads a stage direction out loud | A tag escaped validation | Turn tags off, or hand-edit `tags.json` and re-run `generate` |
-| `OPENAI_TAG_MODEL` error on startup | Env var unset | Set it in `.env` to a model id from `client.models.list()` |
-| Read sounds flat, log says "generating UNTAGGED" | No LLM key found, so tagging degraded | Set `ANTHROPIC_API_KEY`, or `OPENAI_API_KEY` + `OPENAI_TAG_MODEL`, and re-run — only re-tagged chunks regenerate |
-| Unexpected Anthropic/OpenAI charges | Tagging is on by default and picked up a key you'd set for something else | Run with `--tagger none`, or set `tagger.engine` to `"none"` in `config.json` |
+| `OPENAI_TAG_MODEL` error on startup | API-backed `codex` mode has no model configured | Set it in `.env` to a model id from `client.models.list()` |
+| Codex CLI tagger says authentication failed | The local CLI is not signed in | Run `codex login`, then re-run; tagging failures degrade to untagged audio |
+| Read sounds flat, log says "generating UNTAGGED" | No selected tagger is available, so tagging degraded | Run `codex login`, or select a configured provider, and re-run — only re-tagged chunks regenerate |
+| Unexpected Anthropic/OpenAI charges | An API-backed tagger was selected explicitly | Run with `--tagger codex-cli` or `--tagger none` |
 | A chapter heading wasn't detected | The heading line wasn't standalone | Put `Chapter N` (optionally `: Title`) on its own line with nothing else on it |
 | `ffmpeg` reports a command-line-too-long error | The concat filter was used instead of the list-file demuxer | Keep the stitcher on `-f concat -safe 0 -i list.txt`; do not put every chunk path on the command line |
 | A run restarts from zero instead of resuming | The chunk text or its tag changed, so its hash changed | Expected behavior - only edited chunks regenerate; unrelated chunks still skip |

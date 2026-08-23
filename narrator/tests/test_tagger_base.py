@@ -299,9 +299,10 @@ def test_tags_json_round_trips(tmp_path):
 
 def test_registry_lists_claude_and_codex_without_importing_adapters():
     before = set(sys.modules)
-    assert set(base.available_backends()) == {"claude", "codex"}
+    assert set(base.available_backends()) == {"claude", "codex", "codex-cli"}
     assert "tagger.claude" not in (set(sys.modules) - before)
     assert "tagger.codex" not in (set(sys.modules) - before)
+    assert "tagger.codex_cli" not in (set(sys.modules) - before)
 
 
 def test_get_backend_imports_adapter_only_when_called(monkeypatch):
@@ -341,13 +342,15 @@ def test_auto_resolves_claude_with_only_anthropic_key():
     assert base.resolve_auto({"ANTHROPIC_API_KEY": "x"}) == "claude"
 
 
-def test_auto_resolves_codex_with_only_openai_key_and_model():
+def test_auto_resolves_codex_with_only_openai_key_and_model(monkeypatch):
+    monkeypatch.setattr(base, "codex_cli_available", lambda env: False)
     assert (
         base.resolve_auto({"OPENAI_API_KEY": "x", "OPENAI_TAG_MODEL": "gpt-5"}) == "codex"
     )
 
 
-def test_auto_resolves_codex_requires_both_openai_key_and_model():
+def test_auto_resolves_codex_requires_both_openai_key_and_model(monkeypatch):
+    monkeypatch.setattr(base, "codex_cli_available", lambda env: False)
     assert base.resolve_auto({"OPENAI_API_KEY": "x"}) is None
     assert base.resolve_auto({"OPENAI_TAG_MODEL": "gpt-5"}) is None
 
@@ -361,5 +364,11 @@ def test_auto_prefers_claude_when_both_are_set():
     assert base.resolve_auto(env) == "claude"
 
 
-def test_auto_returns_none_when_neither_is_set():
+def test_auto_resolves_codex_cli_when_available(monkeypatch):
+    monkeypatch.setattr(base, "codex_cli_available", lambda env: True)
+    assert base.resolve_auto({}) == "codex-cli"
+
+
+def test_auto_returns_none_when_neither_is_set(monkeypatch):
+    monkeypatch.setattr(base, "codex_cli_available", lambda env: False)
     assert base.resolve_auto({}) is None

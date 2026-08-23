@@ -67,8 +67,8 @@ function buildRunArgs(body) {
   }
   if (body.tagger !== undefined && body.tagger !== '') {
     const tagger = textValue(body.tagger, 'tagger');
-    if (!['none', 'claude', 'codex'].includes(tagger)) {
-      throw new Error('tagger must be none, claude, or codex');
+    if (!['none', 'claude', 'codex', 'codex-cli'].includes(tagger)) {
+      throw new Error('tagger must be none, claude, codex, or codex-cli');
     }
     args.push('--tagger', tagger);
   }

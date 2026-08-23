@@ -27,6 +27,7 @@ import json
 import logging
 import os
 import re
+import shutil
 from pathlib import Path
 from typing import Callable
 
@@ -301,6 +302,7 @@ def parse_and_validate_response(
 _BACKEND_MODULES: dict[str, tuple[str, str]] = {
     "claude": ("tagger.claude", "tag"),
     "codex": ("tagger.codex", "tag"),
+    "codex-cli": ("tagger.codex_cli", "tag"),
 }
 
 
@@ -327,12 +329,28 @@ def get_backend(name: str) -> TagFn:
     return getattr(module, attr_name)
 
 
+def codex_cli_available(env: dict | None = None) -> bool:
+    """Return whether the configured Codex CLI executable can be found.
+
+    This is a cheap executable lookup rather than a login probe. The CLI
+    itself handles authentication when ``codex exec`` starts.
+    ``CODEX_CLI_PATH`` may be either an absolute path or a command name.
+    """
+    e = env if env is not None else os.environ
+    configured = e.get("CODEX_CLI_PATH") or "codex"
+    candidate = os.path.expanduser(configured)
+    if os.path.isfile(candidate):
+        return True
+    return shutil.which(configured) is not None
+
+
 def resolve_auto(env: dict | None = None) -> str | None:
     """`--tagger auto` resolution, per BUILD-PROMPT §6.0.
 
     1. ANTHROPIC_API_KEY set -> "claude"
-    2. else OPENAI_API_KEY and OPENAI_TAG_MODEL both set -> "codex"
-    3. else -> None (caller must proceed untagged and print the recommendation)
+    2. else Codex CLI executable found -> "codex-cli"
+    3. else OPENAI_API_KEY and OPENAI_TAG_MODEL both set -> "codex"
+    4. else -> None (caller must proceed untagged and print the recommendation)
 
     `env` defaults to `os.environ`; a real mapping can be passed in tests to
     avoid mutating process environment.
@@ -341,6 +359,8 @@ def resolve_auto(env: dict | None = None) -> str | None:
 
     if e.get("ANTHROPIC_API_KEY"):
         return "claude"
+    if codex_cli_available(e):
+        return "codex-cli"
     if e.get("OPENAI_API_KEY") and e.get("OPENAI_TAG_MODEL"):
         return "codex"
     return None

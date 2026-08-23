@@ -107,7 +107,7 @@ def load_config() -> tuple[dict, dict]:
         "gaps": {"chunk_gap_ms": 900, "title_gap_ms": 3000, "chapter_gap_ms": 2000, "mid_paragraph_gap_ms": None},
         "concurrency": {"start": 3, "ramp_up": False},
         "fish": {"model": "s2.1-pro-free"},
-        "tagger": {"engine": "auto", "effort": "low"},
+        "tagger": {"engine": "codex-cli", "effort": "low"},
         "normalize_output": False,
     }
     config_path = ROOT / "config.json"
@@ -138,6 +138,9 @@ def _effective_config(args: argparse.Namespace) -> tuple[dict, dict]:
     config["tagger"]["tag_model"] = args.tag_model or env.get("OPENAI_TAG_MODEL")
     if args.tag_model:
         env["OPENAI_TAG_MODEL"] = args.tag_model
+    for name in ("CODEX_CLI_PATH", "CODEX_CLI_TIMEOUT_SECONDS"):
+        if env.get(name):
+            os.environ[name] = str(env[name])
     if args.ramp_up:
         config["concurrency"]["ramp_up"] = True
     return config, env
@@ -219,10 +222,20 @@ def _resolve_tagger(requested: str, env: dict) -> str | None:
     if requested == "auto":
         resolved = tagger_base.resolve_auto(env)
         if resolved:
-            events.log(f"tagger resolved to {resolved}; delivery tagging bills that account")
+            if resolved == "codex-cli":
+                events.log("tagger resolved to codex-cli; using the saved Codex CLI sign-in")
+            else:
+                events.log(f"tagger resolved to {resolved}; delivery tagging bills that account")
         else:
-            events.log("no LLM tagger key found; continuing untagged (set ANTHROPIC_API_KEY or OPENAI_API_KEY + OPENAI_TAG_MODEL to enable tagging)")
+            events.log("no tagger available; continuing untagged (set ANTHROPIC_API_KEY, OPENAI_API_KEY + OPENAI_TAG_MODEL, or install/sign in to Codex CLI)")
         return resolved
+    if requested == "codex-cli":
+        if not tagger_base.codex_cli_available(env):
+            raise RuntimeError(
+                "--tagger codex-cli requires the Codex CLI; install it or set CODEX_CLI_PATH"
+            )
+        events.log("tagger resolved to codex-cli; using the saved Codex CLI sign-in")
+        return requested
     required = "ANTHROPIC_API_KEY" if requested == "claude" else "OPENAI_API_KEY"
     if not env.get(required):
         raise RuntimeError(f"--tagger {requested} requires {required}")
@@ -405,7 +418,7 @@ def build_parser() -> argparse.ArgumentParser:
         sub.add_argument("--normalize", action="store_true")
         sub.add_argument("--single-file", action="store_true")
         sub.add_argument("--force", action="store_true")
-        sub.add_argument("--tagger", choices=("auto", "none", "claude", "codex"), default=None)
+        sub.add_argument("--tagger", choices=("auto", "none", "claude", "codex", "codex-cli"), default=None)
         sub.add_argument("--tag-model", default=None)
         sub.add_argument("--tags-review", action="store_true")
         sub.add_argument("--model", default=None)

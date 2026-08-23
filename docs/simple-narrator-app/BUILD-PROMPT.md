@@ -524,10 +524,10 @@ defense is keeping markers short and tightly validated — this is fully specifi
 build the delivery-tag feature to that validator exactly, with no looser path anywhere
 in the pipeline that lets an unvalidated string reach `[bracket] text`.
 
-## 6. Delivery tags — ON by default, Claude AND Codex at full parity
+## 6. Delivery tags - ON by default, Codex CLI plus API backends
 
 Build a `tag` stage in `narrate.py`, run between `chunk` and `generate`:
-`narrate.py tag --tagger auto|none|claude|codex`, **default `auto`.**
+`narrate.py tag --tagger auto|none|claude|codex|codex-cli`, **default `codex-cli`.**
 
 **This stage is on by default and it is the recommended path.** In a narrator-only
 pipeline — one voice, no cast, no dialogue-attribution map — a short delivery tag
