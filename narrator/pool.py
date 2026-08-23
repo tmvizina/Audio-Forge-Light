@@ -241,11 +241,13 @@ class AdaptivePool:
     """
 
     def __init__(self, max_workers: int, target: int = 3):
+        if max_workers < 1:
+            raise ValueError("max_workers must be at least 1")
         if target > max_workers:
             raise ValueError("target cannot exceed max_workers")
         self.max_workers = max_workers
-        self.start_target = target
-        self.target = target
+        self.start_target = max(1, target)
+        self.target = self.start_target
         self.events = [asyncio.Event() for _ in range(max_workers)]
         self._sync_events()
 

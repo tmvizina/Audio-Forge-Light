@@ -23,6 +23,7 @@ import httpx
 import msgpack
 
 FISH_URL = "https://api.fish.audio/v1/tts"
+_SECRET_RUN_RE = re.compile(r"[A-Za-z0-9_-]{20,}")
 
 
 def is_speakable(text: str) -> bool:
@@ -109,7 +110,8 @@ def synthesize(
         # The response TEXT carries the real failure reason (bad reference
         # audio, invalid model id, rate limit) — surface it, not just the
         # status code. Never interpolate api_key into this message.
-        raise RuntimeError(f"Fish TTS request failed ({resp.status_code}): {resp.text}")
+        safe_text = _SECRET_RUN_RE.sub("<redacted>", resp.text)
+        raise RuntimeError(f"Fish TTS request failed ({resp.status_code}): {safe_text}")
 
     if len(resp.content) == 0:
         # A zero-length 2xx body is a failure, not silence. Never write it

@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Narrator</title>
+  <style>
+    :root { color-scheme: dark; font: 15px/1.4 system-ui, sans-serif; }
+    body { max-width: 900px; margin: 2rem auto; padding: 0 1rem; background: #15171a; color: #eef1f4; }
+    h1 { margin-bottom: .25rem; } p { color: #aeb8c2; }
+    form { display: grid; gap: .8rem; padding: 1rem; background: #20242a; border-radius: .6rem; }
+    label { display: grid; gap: .3rem; }
+    input, select, button { font: inherit; padding: .5rem; border: 1px solid #46515d; border-radius: .35rem; background: #111418; color: inherit; }
+    input[type=file] { background: transparent; border: 0; padding-left: 0; }
+    .row { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: .8rem; }
+    .actions { display: flex; gap: .6rem; } button { cursor: pointer; background: #2776d2; border: 0; } button:disabled { opacity: .45; cursor: default; }
+    #cancel { background: #9b3d46; }
+    #log { min-height: 16rem; max-height: 30rem; overflow: auto; padding: .8rem; background: #0c0e10; border-radius: .5rem; white-space: pre-wrap; font: 12px/1.5 ui-monospace, monospace; }
+    .event { border-bottom: 1px solid #252b31; padding: .15rem 0; } .event-error { color: #ff8b8b; }
+    #previews { display: grid; gap: .8rem; } .preview { padding: .7rem; background: #20242a; border-radius: .5rem; } audio { width: 100%; }
+    small { color: #9ca7b1; }
+    @media (max-width: 650px) { .row { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+  <h1>Narrator</h1>
+  <p>Choose the book and voice reference, then watch the Python event stream below.</p>
+  <form id="run-form">
+    <label>Input book (.txt)
+      <input id="book-picker" type="file" accept=".txt,text/plain">
+      <input id="book" type="text" placeholder="Full path to the .txt file" required>
+    </label>
+    <label>Reference clip (.wav)
+      <input id="reference-picker" type="file" accept=".wav,audio/wav,audio/x-wav">
+      <input id="reference" type="text" value="reference/narrator.wav">
+    </label>
+    <div class="row">
+      <label>Gap (ms)<input id="gap_ms" type="number" min="0" step="1" value="900"></label>
+      <label>Concurrency<input id="concurrency" type="number" min="1" step="1" value="3"></label>
+      <label>Tagger<select id="tagger"><option>none</option><option>claude</option><option>codex</option></select></label>
+    </div>
+    <small>Some browsers hide the full local path; if needed, type it into the text field.</small>
+    <div class="actions"><button id="start" type="submit">Start</button><button id="cancel" type="button" disabled>Cancel</button></div>
+  </form>
+  <h2>Log</h2>
+  <div id="log" aria-live="polite"></div>
+  <h2>Chapter audio</h2>
+  <div id="previews"></div>
+  <script>
+    const form = document.querySelector('#run-form');
+    const start = document.querySelector('#start');
+    const cancel = document.querySelector('#cancel');
+    const log = document.querySelector('#log');
+    const previews = document.querySelector('#previews');
+    let running = false;
+
+    function addLog(line, isError) {
+      const item = document.createElement('div');
+      item.className = `event${isError ? ' event-error' : ''}`;
+      item.textContent = line;
+      log.appendChild(item);
+      log.scrollTop = log.scrollHeight;
+    }
+
+    function showEvent(line) {
+      let event;
+      try { event = JSON.parse(line); } catch { addLog(line, true); return; }
+      addLog(line, event.event === 'error' || event.event === 'chunk_failed');
+      const audioPath = event.event === 'stitched' && (event.path || event.out_path);
+      if (typeof audioPath !== 'string') return;
+      const box = document.createElement('section');
+      box.className = 'preview';
+      const title = document.createElement('div');
+      title.textContent = event.chapter_id || 'Chapter';
+      const audio = document.createElement('audio');
+      audio.controls = true;
+      audio.src = `/api/audio?path=${encodeURIComponent(audioPath)}`;
+      box.append(title, audio);
+      previews.appendChild(box);
+    }
+
+    function bindPicker(pickerId, pathId) {
+      document.querySelector(`#${pickerId}`).addEventListener('change', (change) => {
+        const file = change.target.files[0];
+        if (file) document.querySelector(`#${pathId}`).value = file.path || file.name;
+      });
+    }
+
+    bindPicker('book-picker', 'book');
+    bindPicker('reference-picker', 'reference');
+    const events = new EventSource('/api/events');
+    events.onmessage = (message) => showEvent(message.data);
+    events.onerror = () => addLog('Event stream disconnected; it will reconnect automatically.', true);
+
+    form.addEventListener('submit', async (submit) => {
+      submit.preventDefault();
+      if (running) return;
+      running = true; start.disabled = true; cancel.disabled = false;
+      addLog('Starting run…');
+      const body = {
+        book: document.querySelector('#book').value.trim(),
+        reference: document.querySelector('#reference').value.trim(),
+        gap_ms: document.querySelector('#gap_ms').value,
+        concurrency: document.querySelector('#concurrency').value,
+        tagger: document.querySelector('#tagger').value,
+      };
+      try {
+        const result = await fetch('/api/run', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+        const payload = await result.json();
+        if (!result.ok) addLog(payload.error || `Start failed (${result.status})`, true);
+      } catch (error) { addLog(error.message, true); }
+      if (!running) return;
+    });
+
+    cancel.addEventListener('click', async () => {
+      try {
+        const result = await fetch('/api/cancel', { method: 'POST' });
+        const payload = await result.json();
+        addLog(payload.cancelled ? 'Run cancelled.' : 'No active run.');
+      } catch (error) { addLog(error.message, true); }
+      running = false; start.disabled = false; cancel.disabled = true;
+    });
+  </script>
+</body>
+</html>

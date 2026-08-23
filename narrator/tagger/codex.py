@@ -173,7 +173,11 @@ def tag(batch: list[Chunk]) -> dict[str, str]:
         )
         return {}
 
-    import openai  # lazy: never imported merely by importing tagger.codex
+    try:
+        import openai  # lazy: never imported merely by importing tagger.codex
+    except ImportError:
+        logger.error("codex tagger: optional openai package is not installed")
+        return {}
 
     try:
         client = openai.OpenAI()

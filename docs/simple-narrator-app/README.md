@@ -346,4 +346,5 @@ baseline, or immediately on any 429, 5xx, or timeout. It only climbs back up if 
 | Read sounds flat, log says "generating UNTAGGED" | No LLM key found, so tagging degraded | Set `ANTHROPIC_API_KEY`, or `OPENAI_API_KEY` + `OPENAI_TAG_MODEL`, and re-run — only re-tagged chunks regenerate |
 | Unexpected Anthropic/OpenAI charges | Tagging is on by default and picked up a key you'd set for something else | Run with `--tagger none`, or set `tagger.engine` to `"none"` in `config.json` |
 | A chapter heading wasn't detected | The heading line wasn't standalone | Put `Chapter N` (optionally `: Title`) on its own line with nothing else on it |
-| A run restarts from zero instead of resuming | The chunk text or its tag changed, so its hash changed | Expected behavior — only edited chunks regenerate; unrelated chunks still skip |
+| `ffmpeg` reports a command-line-too-long error | The concat filter was used instead of the list-file demuxer | Keep the stitcher on `-f concat -safe 0 -i list.txt`; do not put every chunk path on the command line |
+| A run restarts from zero instead of resuming | The chunk text or its tag changed, so its hash changed | Expected behavior - only edited chunks regenerate; unrelated chunks still skip |

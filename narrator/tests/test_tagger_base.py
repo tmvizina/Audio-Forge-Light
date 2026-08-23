@@ -298,9 +298,10 @@ def test_tags_json_round_trips(tmp_path):
 
 
 def test_registry_lists_claude_and_codex_without_importing_adapters():
+    before = set(sys.modules)
     assert set(base.available_backends()) == {"claude", "codex"}
-    assert "tagger.claude" not in sys.modules
-    assert "tagger.codex" not in sys.modules
+    assert "tagger.claude" not in (set(sys.modules) - before)
+    assert "tagger.codex" not in (set(sys.modules) - before)
 
 
 def test_get_backend_imports_adapter_only_when_called(monkeypatch):

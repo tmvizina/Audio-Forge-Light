@@ -500,3 +500,165 @@ def build_chunks(
             )
         )
     return chunks
+
+
+# ---------------------------------------------------------------------------
+# T07 - chapter detection and title chunks
+# ---------------------------------------------------------------------------
+
+_CHAPTER_HEADING_RE = re.compile(
+    r"^\s*Chapter\s+(\d+(?:\.\d+)?)\s*[:\-–—]?\s*(.*?)\s*$",
+    re.IGNORECASE,
+)
+_ONES = [
+    "", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine"
+]
+_TEENS = [
+    "ten", "eleven", "twelve", "thirteen", "fourteen", "fifteen",
+    "sixteen", "seventeen", "eighteen", "nineteen",
+]
+_TENS = [
+    "", "", "twenty", "thirty", "forty", "fifty", "sixty", "seventy",
+    "eighty", "ninety",
+]
+
+
+def chapter_id(num_str: str) -> str:
+    """Return the stable chapter id used by manifests and output folders."""
+    if "." in str(num_str):
+        whole, frac = str(num_str).split(".", 1)
+        return f"ch{int(whole):02d}_{frac}"
+    return f"ch{int(num_str):02d}"
+
+
+def int_to_words(n: int) -> str:
+    """Spell the small chapter numbers used by novels without a dependency."""
+    n = int(n)
+    if n < 0:
+        return "minus " + int_to_words(-n)
+    if n < 10:
+        return _ONES[n]
+    if n < 20:
+        return _TEENS[n - 10]
+    if n < 100:
+        return _TENS[n // 10] + (f"-{_ONES[n % 10]}" if n % 10 else "")
+    if n < 1000:
+        rest = n % 100
+        prefix = f"{_ONES[n // 100]} hundred"
+        return prefix if rest == 0 else f"{prefix} {int_to_words(rest)}"
+    return str(n)
+
+
+def chapter_number_words(num_str: str) -> str:
+    """Spell an integer or decimal chapter number for narration."""
+    value = str(num_str)
+    if "." in value:
+        whole, frac = value.split(".", 1)
+        return f"{int_to_words(int(whole))} point {int_to_words(int(frac))}"
+    return int_to_words(int(value))
+
+
+def chapter_title_text(num_str: str, subtitle: str = "") -> str:
+    """Build the spoken title chunk text for a detected chapter heading."""
+    title = f"Chapter {chapter_number_words(num_str).title()}."
+    subtitle = subtitle.strip()
+    if subtitle:
+        if subtitle[-1] not in ".!?":
+            subtitle += "."
+        title += f" {subtitle}"
+    return title
+
+
+def split_chapters(text: str) -> list[dict]:
+    """Split a book into front matter and standalone ``Chapter N`` sections.
+
+    Each returned record contains ``chapter_id``, ``number`` (or ``None`` for
+    front matter), ``title`` and the body ``text``. The heading line itself is
+    excluded from body text; callers can turn ``number``/``title`` into the
+    dedicated title chunk below.
+    """
+    lines = text.splitlines(keepends=True)
+    matches: list[tuple[int, re.Match[str]]] = []
+    for index, line in enumerate(lines):
+        match = _CHAPTER_HEADING_RE.match(line.rstrip("\r\n"))
+        if match:
+            matches.append((index, match))
+
+    if not matches:
+        return [{"chapter_id": "ch00", "number": None, "title": "", "text": text}]
+
+    chapters: list[dict] = []
+    front_end = matches[0][0]
+    chapters.append(
+        {"chapter_id": "ch00", "number": None, "title": "", "text": "".join(lines[:front_end])}
+    )
+    for position, (start, match) in enumerate(matches):
+        end = matches[position + 1][0] if position + 1 < len(matches) else len(lines)
+        number, subtitle = match.group(1), match.group(2).strip()
+        chapters.append(
+            {
+                "chapter_id": chapter_id(number),
+                "number": number,
+                "title": subtitle,
+                "text": "".join(lines[start + 1 : end]),
+            }
+        )
+    return chapters
+
+
+def build_chapter_chunks(
+    text: str,
+    *,
+    target_chars: int = TARGET_CHARS,
+    max_chars: int = MAX_CHARS,
+    min_chars: int = MIN_CHARS,
+    hard_split_chars: int = HARD_SPLIT_CHARS,
+) -> list[dict]:
+    """Return chapter records with fully-built ``Chunk`` lists."""
+    result: list[dict] = []
+    for chapter in split_chapters(text):
+        number = chapter["number"]
+        chunks: list[Chunk] = []
+        if number is not None:
+            title = chapter_title_text(number, chapter["title"])
+            chunks.append(
+                Chunk(
+                    chunk_id=f"{chapter['chapter_id']}_0000",
+                    position=0,
+                    text=title,
+                    char_count=len(title),
+                    text_hash=compute_text_hash(title),
+                    kind="title",
+                    boundary="ends_section",
+                    over_cap=False,
+                )
+            )
+            chunks.extend(
+                build_chunks(
+                    chapter["text"],
+                    chapter_id=chapter["chapter_id"],
+                    start_position=1,
+                    target_chars=target_chars,
+                    max_chars=max_chars,
+                    min_chars=min_chars,
+                    hard_split_chars=hard_split_chars,
+                )
+            )
+        else:
+            chunks = build_chunks(
+                chapter["text"],
+                chapter_id=chapter["chapter_id"],
+                start_position=0,
+                target_chars=target_chars,
+                max_chars=max_chars,
+                min_chars=min_chars,
+                hard_split_chars=hard_split_chars,
+            )
+        result.append({**chapter, "chunks": chunks})
+    return result
+
+
+# Friendly aliases used by integrations that treat the module as a book
+# chunker rather than a chapter splitter.
+chunk_book = build_chapter_chunks
+split_book = split_chapters

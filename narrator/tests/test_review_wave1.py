@@ -174,20 +174,14 @@ def test_PROOF_plain_429_runtimeerror_does_not_trigger_degrade():
 # ---------------------------------------------------------------------------
 
 
-def test_PROOF_scrub_misses_key_shaped_substring_embedded_in_message(capsys):
+def test_scrub_rejects_key_shaped_substring_embedded_in_message(capsys):
     secret = "sk-fish-ABCDEFGHIJKLMNOPQRSTUVWXYZ01234"  # 40 chars, key-shaped
     message = f"Fish TTS request failed (401): invalid api key {secret} supplied"
 
-    # No SecretLeakError raised...
-    events.emit_chunk_failed("ch01_0000", 0, 10, message)
+    with pytest.raises(events.SecretLeakError):
+        events.emit_chunk_failed("ch01_0000", 0, 10, message)
 
-    out = capsys.readouterr().out
-    assert secret not in out, (
-        "a key-shaped substring embedded in a longer error message was not "
-        "scrubbed and leaked onto stdout -- events._scrub's "
-        "_KEY_SHAPED_RE only matches when the ENTIRE field value is "
-        "key-shaped, not when one is embedded in a sentence"
-    )
+    assert secret not in capsys.readouterr().out
 
 
 # ---------------------------------------------------------------------------
@@ -274,15 +268,7 @@ def test_courtesy_gate_serializes_call_starts_pool_wide():
 # ---------------------------------------------------------------------------
 
 
-def test_init_with_target_zero_is_not_clamped_to_floor():
+def test_init_with_target_zero_is_clamped_to_floor():
     p = AdaptivePool(max_workers=3, target=0)
-    # No event is set -- every worker would park forever on the very first
-    # iteration and the queue would never drain. This asserts the CURRENT
-    # (unguarded) behavior rather than actually running the pool, to avoid
-    # hanging the suite if this is never fixed.
-    assert p.target == 0
-    assert not any(ev.is_set() for ev in p.events), (
-        "AdaptivePool.__init__ does not clamp target to the floor of 1 the "
-        "way set_target() does -- target=0 at construction silently parks "
-        "every worker with no way to ever start"
-    )
+    assert p.target == 1
+    assert p.events[0].is_set()

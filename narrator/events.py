@@ -38,7 +38,7 @@ from typing import Any
 # A bare run of 20+ "secret alphabet" characters (alnum, -, _) with no
 # whitespace or path/URL separators is treated as key-shaped. Paths, chunk
 # ids, and prose all contain "/", ".", or spaces, so they never trip this.
-_KEY_SHAPED_RE = re.compile(r"^[A-Za-z0-9_-]{20,}$")
+_KEY_SHAPED_RE = re.compile(r"[A-Za-z0-9_-]{20,}")
 
 
 class SecretLeakError(ValueError):
@@ -48,7 +48,7 @@ class SecretLeakError(ValueError):
 def _scrub(value: Any, path: str = "$") -> Any:
     """Recursively validate a value contains nothing key-shaped. Returns value unchanged."""
     if isinstance(value, str):
-        if _KEY_SHAPED_RE.match(value):
+        if _KEY_SHAPED_RE.search(value):
             raise SecretLeakError(
                 f"refusing to emit event: value at {path} looks like a secret/API key"
             )

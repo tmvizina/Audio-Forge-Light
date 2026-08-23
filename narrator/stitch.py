@@ -21,6 +21,7 @@ config (T01) by the caller and passed in.
 from __future__ import annotations
 
 import subprocess
+import re
 from pathlib import Path
 from typing import Sequence
 
@@ -239,7 +240,29 @@ def ffprobe_duration_s(path: Path) -> float:
 
 
 def chapter_output_path(out_dir: Path, book: str, chapter_num: int, chapter_title: str) -> Path:
-    return out_dir / book / f"Chapter {chapter_num:02d} - {chapter_title}.mp3"
+    def safe(value: str) -> str:
+        value = re.sub(r'[<>:"/\\|?*\x00-\x1f]', "_", str(value))
+        return value.strip(" .") or "untitled"
+
+    return out_dir / safe(book) / f"Chapter {chapter_num:02d} - {safe(chapter_title)}.mp3"
+
+
+def render_gap_mp3(gaps_dir: Path, ms: int) -> Path:
+    """Render a cached MP3 gap for the optional chapter-level concat pass."""
+    gaps_dir.mkdir(parents=True, exist_ok=True)
+    out_path = gaps_dir / f"gap_{ms}ms.mp3"
+    if out_path.exists() and out_path.stat().st_size > 0:
+        return out_path
+    subprocess.run(
+        [
+            FFMPEG, "-y", "-f", "lavfi", "-i", "anullsrc=r=44100:cl=mono",
+            "-t", str(ms / 1000.0), "-c:a", "libmp3lame", "-b:a", "128k",
+            "-ar", "44100", "-ac", "1", str(out_path),
+        ],
+        check=True,
+        capture_output=True,
+    )
+    return out_path
 
 
 def stitch_chapter(
@@ -289,7 +312,7 @@ def stitch_book(
     for i, path in enumerate(chapter_mp3_paths):
         segments.append(path)
         if i != n - 1:
-            segments.append(render_gap_wav(gaps_dir, chapter_gap_ms))
+            segments.append(render_gap_mp3(gaps_dir, chapter_gap_ms))
     list_path = list_dir / "book_list.txt"
     write_list_file(segments, list_path)
     return run_ffmpeg_concat(list_path, out_path, normalize=normalize)
