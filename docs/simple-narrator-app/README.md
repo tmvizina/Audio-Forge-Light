@@ -170,6 +170,9 @@ Useful flags on any stage:
 - `--single-file` — stitch the whole book into one mp3 instead of one per chapter
 - `--ramp-up` — allow concurrency to climb back up after a run of fast, clean calls
   (off by default; see Cost and time below)
+- `--tagger auto|none|claude|codex` — delivery tags; `auto` is the default (see
+  "Emotion tags")
+- `--tags-review` — stop after writing `tags.json`, before any TTS spend
 
 If you'd rather click than type, start the browser UI:
 
@@ -239,14 +242,35 @@ or mid-paragraph — even though the app only applies one uniform gap today. Tha
 there so a future `--mid-paragraph-gap-ms` flag could shorten just the mid-paragraph
 seams without touching the paragraph and scene breaks.
 
-## Optional: emotion tags
+## Emotion tags — on by default
 
-Off by default. When enabled, a small LLM pass reads each chunk and labels it with a
-short delivery hint — `weary`, `bitter amusement`, `flat` — which gets applied as a
-leading `[tag]` marker that the TTS reads as a direction rather than speaking aloud.
+This is what makes the read sound like someone who has actually read the book.
 
-You can drive this with either provider, and both get full parity — pick whichever
-account you already have:
+A small LLM pass reads each chunk and labels it with a short delivery hint — `weary`,
+`bitter amusement`, `flat` — applied as a leading `[tag]` marker that the TTS interprets
+as direction rather than speaking aloud. Without it, every chunk lands in the same flat
+register: a death and a breakfast are delivered identically. The voice model is perfectly
+capable of grief, urgency, and dry amusement; the tag is the only channel that tells it
+which one this passage needs.
+
+**It's on by default (`--tagger auto`).** On each run the app picks a backend from what
+your environment has:
+
+| What you have set | What happens |
+|---|---|
+| `ANTHROPIC_API_KEY` | tags via `claude-opus-5` |
+| `OPENAI_API_KEY` + `OPENAI_TAG_MODEL` | tags via your OpenAI account |
+| both | Anthropic wins |
+| neither | runs **untagged**, and prints how to turn it on |
+
+So the app still works with nothing but a Fish key — it degrades, it doesn't fail. But it
+will tell you what you're missing, because the difference is audible.
+
+**To turn it off:** `--tagger none`, or set `tagger.engine` to `"none"` in `config.json`.
+That also silences the reminder.
+
+Both providers have full parity — pick whichever account you already have, you lose
+nothing either way:
 
 ```powershell
 python narrate.py tag --book mybook.txt --tagger claude
@@ -262,9 +286,15 @@ Add `--tags-review` to stop right after `tags.json` is written, before any TTS c
 happen. That lets you read through the tags and hand-edit anything odd before spending
 money generating audio.
 
-One thing to know going in: tags are a **second API bill**, separate from Fish Audio.
-It's small — one short call per chunk — but it's real, and it happens even if you never
-touch generation afterward.
+**One thing to know going in, because this defaults on:** tags are a **second API bill**,
+separate from Fish Audio. It's small — one short, cached call per batch of chunks — but
+it's real, and it happens even if you never touch generation afterward. If you set an
+`ANTHROPIC_API_KEY` or `OPENAI_API_KEY` for something else, this pipeline will find it and
+use it. Run with `--tagger none` if you'd rather it didn't.
+
+Re-tagging is cheap in the way that matters: because a chunk's identity hash covers its
+tag, changing tags regenerates **only** the chunks whose tag actually changed — not the
+book.
 
 And a hard rule, worth knowing before it surprises you: tags are validated to short
 lowercase words only. That limit exists because long, free-form direction text gets
@@ -313,5 +343,7 @@ baseline, or immediately on any 429, 5xx, or timeout. It only climbs back up if 
 | Output sounds robotic or not like you | Reference clip too long, too noisy, or transcript mismatch | Re-record following the guidance above, or re-run `prep-ref --clean` |
 | Narrator reads a stage direction out loud | A tag escaped validation | Turn tags off, or hand-edit `tags.json` and re-run `generate` |
 | `OPENAI_TAG_MODEL` error on startup | Env var unset | Set it in `.env` to a model id from `client.models.list()` |
+| Read sounds flat, log says "generating UNTAGGED" | No LLM key found, so tagging degraded | Set `ANTHROPIC_API_KEY`, or `OPENAI_API_KEY` + `OPENAI_TAG_MODEL`, and re-run — only re-tagged chunks regenerate |
+| Unexpected Anthropic/OpenAI charges | Tagging is on by default and picked up a key you'd set for something else | Run with `--tagger none`, or set `tagger.engine` to `"none"` in `config.json` |
 | A chapter heading wasn't detected | The heading line wasn't standalone | Put `Chapter N` (optionally `: Title`) on its own line with nothing else on it |
 | A run restarts from zero instead of resuming | The chunk text or its tag changed, so its hash changed | Expected behavior — only edited chunks regenerate; unrelated chunks still skip |

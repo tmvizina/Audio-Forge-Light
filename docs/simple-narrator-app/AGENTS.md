@@ -3,8 +3,8 @@
 `narrator` turns a plain `.txt` novel into audiobook mp3s read in the user's own cloned
 voice, via the hosted Fish Audio API. A Python CLI (`narrate.py`) is the real app; an
 optional ~150-line Node/express server is a thin browser wrapper around it. It runs on a
-light Windows machine — no GPU, no torch, no numpy. Pipeline stages: `chunk` → (optional
-`tag`) → `generate` → `stitch`, or the combined `run`. Read the Invariants section before
+light Windows machine — no GPU, no torch, no numpy. Pipeline stages: `chunk` → `tag`
+(on by default) → `generate` → `stitch`, or the combined `run`. Read the Invariants section before
 changing anything.
 
 ## Repo map
@@ -15,8 +15,8 @@ changing anything.
 | `chunker.py` | Sentence-aware splitting and greedy packing into chunks |
 | `fish_client.py` | Hosted Fish Audio TTS client (msgpack wire format) |
 | `tagger/base.py` | Shared tagger contract, validator, JSON schema, vocabulary |
-| `tagger/claude.py` | Anthropic-backed delivery tagger (optional) |
-| `tagger/codex.py` | OpenAI-backed delivery tagger (optional) |
+| `tagger/claude.py` | Anthropic-backed delivery tagger |
+| `tagger/codex.py` | OpenAI-backed delivery tagger |
 | `pool.py` | Adaptive-concurrency worker pool for `generate` |
 | `stitch.py` | ffmpeg assembly: gaps, concat demuxer, final mp3 encode |
 | `server/index.js` | Node/express wrapper; spawns `narrate.py`, streams its NDJSON to the browser |
@@ -97,6 +97,37 @@ changing anything.
 12. **A failed chunk never kills the run.** Record it, continue, print failures at the
     end.
 
+## Delivery tags are ON by default
+
+`--tagger` defaults to `auto`. Resolution order: `ANTHROPIC_API_KEY` -> claude;
+else `OPENAI_API_KEY` + `OPENAI_TAG_MODEL` -> codex; else **untagged**, with a
+recommendation printed to stderr.
+
+Three rules an agent must not quietly change:
+
+- **`auto` degrades, it never fails.** A user with only a Fish key still gets an
+  audiobook. Do not turn a missing LLM key into an error on the `auto` path.
+- **An explicit `--tagger claude` / `--tagger codex` with a missing key DOES fail.** An
+  explicit choice that cannot be honoured is an error, not a silent downgrade. Do not
+  "helpfully" make these fall back.
+- **`--tagger none` silences the recommendation.** A user who has opted out is not nagged
+  on every run.
+
+**Why it defaults on:** tags are the only expressive control in a narrator-only pipeline.
+Untagged, every chunk lands in the same flat register regardless of the scene. This is an
+audible quality difference, which is why it is the default and why the README recommends
+it. **When a user reports flat, monotonous, or lifeless output, check whether the run
+resolved to untagged before investigating anything else** — it is by far the most common
+cause, and the fix is a key, not a code change.
+
+**Because it defaults on, the tag validator in `tagger/base.py` is on the critical path.** Every default run
+feeds model-authored text into the TTS input. The validator is the only thing between that
+and a narrator reading stage directions aloud. Never loosen it for convenience.
+
+**And it bills a second account.** Tagging is a real charge on the user's Anthropic or
+OpenAI account, incurred by default. The resolved backend and that fact must be stated in
+the `run_started` stderr line. Never make this quieter.
+
 ## Sampling-parameter warning for the Claude tagger
 
 On `claude-opus-5`, `temperature`, `top_p`, and `budget_tokens` were removed — each
@@ -144,7 +175,8 @@ backend, not inside it. Register the backend where `fish_client.py` is selected 
 **Adding a tagger backend.** Implement the `tagger/base.py` contract
 `tag(batch: list[Chunk]) -> dict[chunk_id, str]`. Reuse the SHARED validator and the
 shared JSON schema `{"items":[{"chunk_id":…,"tag":…}]}` — never write a backend-specific
-validator. Register it in the `--tagger` CLI choices. Parity requirement: any tagger
+validator. Register it in the shared `tagger/base.py` registry (backends are looked up
+by name, so adding one touches no other backend's file). Parity requirement: any tagger
 backend must leave a user of that backend with the full feature, not a subset.
 
 ## Running the tests
@@ -175,6 +207,8 @@ Acceptance tests:
 | Chapter headings not detected | the chapter regex in `chunker.py` |
 | Voice sounds wrong | `reference/`, re-run `prep-ref` (not a code change) |
 | Add an emotion vocabulary word | the vocabulary list in `tagger/base.py` |
+| Output sounds flat / monotonous | check the resolved tagger first — an `auto` run with no LLM key is untagged |
+| Turn tagging off | `--tagger none`, or `tagger.engine` in `config.json` |
 | TTS request failing | `fish_client.py`, check the `model` header first |
 | Run is too slow / too many 429s | `pool.py` concurrency policy |
 | UI shows nothing | the NDJSON contract, check the child's stdout is unbuffered |

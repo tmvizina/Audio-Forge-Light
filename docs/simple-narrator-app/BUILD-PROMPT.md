@@ -66,7 +66,7 @@ narrator/
   narrate.py          # CLI: chunk | tag | generate | stitch | run | prep-ref
   chunker.py          # sentence-aware packing
   fish_client.py      # hosted Fish Audio TTS
-  tagger/             # OPTIONAL delivery tags: base.py, claude.py, codex.py
+  tagger/             # delivery tags (ON by default): base.py, claude.py, codex.py
   pool.py             # adaptive concurrency
   stitch.py           # ffmpeg assembly
   server/             # Node wrapper (index.js + one static HTML page)
@@ -96,8 +96,9 @@ feature (§6). Each is imported **lazily, inside its adapter module, and never a
 scope** — `tagger/claude.py` does `import anthropic` inside its functions, not at the top
 of the file, and the same for `tagger/codex.py` and `openai`. This means a user who never
 installs the tagger extras can still run `chunk`, `generate`, and `stitch` without either
-package present; import errors only surface if they actually invoke `--tagger claude` or
-`--tagger codex`.
+package present. Tagging defaults to `auto` (§6.0), which resolves to *untagged* when no
+LLM key is set, so the no-extras install still runs end to end; an import error can only
+surface once a user has actually supplied a key or forced `--tagger claude`/`--tagger codex`.
 
 `ffmpeg` and `ffprobe` on `PATH` are the **only binary dependency**. Check for both at
 startup (`shutil.which`) and fail with a clear, actionable message if either is missing —
@@ -523,15 +524,54 @@ defense is keeping markers short and tightly validated — this is fully specifi
 build the delivery-tag feature to that validator exactly, with no looser path anywhere
 in the pipeline that lets an unvalidated string reach `[bracket] text`.
 
-## 6. Optional delivery tags — Claude AND Codex at full parity
+## 6. Delivery tags — ON by default, Claude AND Codex at full parity
 
 Build a `tag` stage in `narrate.py`, run between `chunk` and `generate`:
-`narrate.py tag --tagger none|claude|codex`, **default `none`.**
+`narrate.py tag --tagger auto|none|claude|codex`, **default `auto`.**
 
-This is worth building because in a narrator-only pipeline — one voice, no cast, no
-dialogue-attribution map — a short delivery tag prepended to the text (`[weary] ...`) is
-the **only** expressive lever available at all. Without it every chunk reads in exactly
-the same flat register regardless of what's happening in the scene.
+**This stage is on by default and it is the recommended path.** In a narrator-only
+pipeline — one voice, no cast, no dialogue-attribution map — a short delivery tag
+prepended to the text (`[weary] ...`) is the **only** expressive lever available at all.
+Without it every chunk reads in exactly the same flat register regardless of what's
+happening in the scene: a death and a breakfast are delivered identically. The TTS is
+perfectly capable of grief, urgency, and dry amusement — a tag is the only channel
+through which it can be told which one this passage needs. An untagged book is the same
+book read by someone who hasn't read it.
+
+That is why this defaults on rather than off. It is a real, audible quality difference in
+the finished audio, not a nicety.
+
+**6.0 `auto` resolution — and the recommendation when it can't run.** `auto` picks a
+backend from what the environment actually has, in this order:
+
+1. `ANTHROPIC_API_KEY` set → use the Claude adapter (§6.2).
+2. else `OPENAI_API_KEY` **and** `OPENAI_TAG_MODEL` set → use the Codex adapter (§6.3).
+3. else → proceed **untagged**, and print a prominent recommendation to stderr.
+
+Step 3 is what keeps the app runnable with nothing but a Fish key. It must **degrade, not
+fail** — a user who hasn't set up an LLM key still gets their audiobook. But it must not
+degrade quietly:
+
+```
+NOTE: generating UNTAGGED. Every chunk will be read in the same flat register.
+      For markedly more natural delivery - emotional cadence matched to each
+      passage - set one of these and re-run:
+        ANTHROPIC_API_KEY=...                       (uses claude-opus-5)
+        OPENAI_API_KEY=... and OPENAI_TAG_MODEL=...  (uses your OpenAI account)
+      Re-tagging only regenerates chunks whose tag changed. See README "Emotion tags".
+```
+
+`--tagger none` is the explicit opt-out and **must silence that recommendation** — a user
+who has decided is not nagged on every run. `--tagger claude` or `--tagger codex` forces a
+specific backend and **fails loudly** if its key is missing, rather than silently falling
+back: an explicit choice that cannot be honoured is an error, not a downgrade.
+
+Emit the resolved backend in the `run_started` event and on stderr, so it is never a
+mystery which path a given run took.
+
+**Because this is now the default path, §6.4's validator is on the critical path too.**
+Every default run sends model-authored text into the TTS input. The validator is the only
+thing standing between that and §5.4's failure mode. Build it first and build it strictly.
 
 **6.1 Shared contract, backend-independent (`tagger/base.py`).** Both backends implement
 the same function signature and are driven identically by the rest of the pipeline:
@@ -686,10 +726,14 @@ before it is accepted:
   `narrate.py tag --tags-review` runs the tagging stage and then **stops the pipeline
   there**, before any TTS generation happens, specifically so the user can open
   `tags.json`, fix or clear tags they disagree with, and only then run `generate`.
-- State plainly, in the README/config docs, that turning tagging on is a **second API
+- State plainly, in the README and the config comments, that tagging is a **second API
   bill layered on top of Fish Audio** — small per call (short cached system prompt, tiny
-  structured output), but real money, and it should default off (`--tagger none`) for
-  exactly that reason.
+  structured output), but real money. Because this now defaults **on**, that disclosure
+  is not optional fine print: a user who sets an `ANTHROPIC_API_KEY` for some other
+  purpose must not discover this pipeline spending it by surprise. Name the cost in the
+  `run_started` stderr line ("tagging via claude-opus-5 — this bills your Anthropic
+  account"), and document `--tagger none` as the one-flag opt-out everywhere tagging is
+  mentioned.
 
 ## 7. Reference audio handling
 
@@ -1081,8 +1125,11 @@ field filled in with its default:
     "chunk_length": 300
   },
   "tagger": {
-    "engine": "none",
-    "max_tag_chars": 32
+    "_comment": "ON by default. 'auto' = claude if ANTHROPIC_API_KEY, else codex if OPENAI_API_KEY + OPENAI_TAG_MODEL, else untagged with a printed recommendation. Tags carry the emotional cadence that makes the read sound like someone who has read the book; untagged, every chunk lands in the same flat register. This is a SECOND API bill on top of Fish. Opt out with 'none'.",
+    "engine": "auto",
+    "max_tag_chars": 32,
+    "claude_model": "claude-opus-5",
+    "effort": "low"
   },
   "normalize_output": false
 }
@@ -1161,6 +1208,21 @@ command `pytest tests/ -v` runs the whole suite.
    `tags.json` (same schema) and that downstream chunk generation behaves identically
    between the two runs (same tags applied to the same chunk ids).
 
+9. **`auto` resolution (§6.0).** Four cases, each asserted separately by manipulating the
+   environment: `ANTHROPIC_API_KEY` only → resolves to `claude`; `OPENAI_API_KEY` +
+   `OPENAI_TAG_MODEL` only → resolves to `codex`; both set → resolves to `claude` (order
+   matters); neither → resolves to **untagged**, the run **still completes end to end**,
+   and the recommendation is printed to **stderr** (assert it is on stderr and *not* on
+   stdout, where it would corrupt the NDJSON stream).
+
+10. **`--tagger none` silences the recommendation** — same key-less environment as case 4
+    above, but with the explicit flag: the run completes untagged and stderr carries no
+    recommendation. A user who has decided is not nagged on every run.
+
+11. **An explicit backend with a missing key fails loudly.** `--tagger claude` with no
+    `ANTHROPIC_API_KEY` must raise a clear error naming the variable — it must **not**
+    silently fall back to untagged. Assert the same for `--tagger codex`.
+
 ## 14. Troubleshooting table
 
 | Symptom | Likely cause | Fix |
@@ -1173,6 +1235,9 @@ command `pytest tests/ -v` runs the whole suite.
 | Robotic or wrong-sounding voice | reference clip too long, too noisy, or its transcript doesn't match the audio | keep reference ≤30 s, clean single-speaker audio, transcript text matching what's actually said (§7) |
 | Narrator reads a stage direction aloud | a delivery tag escaped validation and reached the TTS as free text | check the tag against the ≤32-char cap and `^[a-z][a-z ,-]*$` vocabulary (§6); a passing regex but semantically sentence-like tag is still a bug — tighten the tagger's allowed vocabulary |
 | `codex` tagger fails immediately naming `OPENAI_TAG_MODEL` | env var unset | this is deliberate, not a bug — there is no default model id (§6); set `OPENAI_TAG_MODEL` in `.env` |
+| Run says "generating UNTAGGED" and the read sounds flat | `auto` found no LLM key, so it degraded (§6.0) | set `ANTHROPIC_API_KEY`, or `OPENAI_API_KEY` + `OPENAI_TAG_MODEL`, then re-run — only chunks whose tag changed regenerate |
+| Unexpected charges on an Anthropic/OpenAI account | tagging is **on by default** and resolved to a key you had set for something else (§6.0) | run with `--tagger none`, or set `tagger.engine` to `"none"` in `config.json` |
+| `--tagger claude` errors instead of falling back | intended — an explicit backend that can't run is an error, not a downgrade (§6.0) | set the named key, or use `--tagger auto` if you want graceful degradation |
 | "command line too long" / process fails to launch during stitch | someone reverted §10's concat demuxer back to the concat filter | use the concat demuxer with a list file, never inline every input on the command line |
 | A resumed run regenerates every chunk in a chapter | the delivery tag changed (tagger re-run, or tagger toggled on/off) | this is **correct** behaviour, not a bug — `text_hash` covers the applied tag (§3), so a tag change must invalidate the cache |
 
