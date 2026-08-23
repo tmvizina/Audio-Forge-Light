@@ -1,7 +1,7 @@
 # T03 — Fish Audio TTS client
 
 **Depends on:** T01. **Blocks:** T09.
-**Read:** `BUILD-PROMPT.md` §5 (lines 359–525). **Nothing else.**
+**Read:** `BUILD-PROMPT.md` §5 (lines 360–526). **Nothing else.**
 
 ## Why this ticket exists
 

@@ -1,7 +1,7 @@
 # T11 — Claude tagger adapter
 
 **Depends on:** T10. **Blocks:** T09.
-**Read:** `BUILD-PROMPT.md` §6.2 (lines 560–616). **Nothing else.**
+**Read:** `BUILD-PROMPT.md` §6.2 (lines 600–656). **Nothing else.**
 
 ## Why this ticket exists
 

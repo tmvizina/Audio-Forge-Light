@@ -48,7 +48,7 @@ composes against. Nothing parallelizes safely until it lands.
 
 | # | Ticket | Owns these files | Spec | Depends on |
 |---|---|---|---|---|
-| 01 | [Scaffold + frozen contracts](T01-scaffold-and-contracts.md) | `config.json`, `.env.example`, `.gitignore`, `requirements.txt`, `types.py`, `events.py`, `preflight.py` | §2, §12, §3.6, §11 events | — |
+| 01 | [Scaffold + frozen contracts](T01-scaffold-and-contracts.md) | `config.json`, `.env.example`, `.gitignore`, `requirements.txt`, `models.py`, `events.py`, `preflight.py` | §2, §12, §3.6, §11 events | — |
 | 02 | [Chunker: sentences + packing](T02-chunker-sentences-and-packing.md) | `chunker.py` | §3.1–3.2 | 01 |
 | 03 | [Fish Audio client](T03-fish-client.md) | `fish_client.py` | §5 | 01 |
 | 04 | [Stitching](T04-stitch.md) | `stitch.py` | §10 | 01 |

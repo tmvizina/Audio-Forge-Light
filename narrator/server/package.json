@@ -1,0 +1,13 @@
+{
+  "name": "narrator-server",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Thin Node/Express wrapper that shells out to narrate.py and streams its NDJSON output. No pipeline logic of its own.",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "express": "^4.19.2"
+  }
+}

@@ -1,8 +1,8 @@
 # T14 — Acceptance gate
 
 **Depends on:** T09, T13. **Blocks:** T15.
-**Read:** `BUILD-PROMPT.md` §13 (lines 1099–1163) and §14 (lines 1164–1178). Also read the
-**Before you report done** checklist (lines 1179–1185). **Nothing else.**
+**Read:** `BUILD-PROMPT.md` §13 (lines 1146–1225) and §14 (lines 1226–1243). Also read the
+**Before you report done** checklist (lines 1244–1250). **Nothing else.**
 
 ## Why this ticket exists
 

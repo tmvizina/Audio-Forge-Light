@@ -1,7 +1,7 @@
 # T04 — ffmpeg stitching
 
 **Depends on:** T01. **Blocks:** T09.
-**Read:** `BUILD-PROMPT.md` §10 (lines 850–957). **Nothing else.**
+**Read:** `BUILD-PROMPT.md` §10 (lines 894–1001). **Nothing else.**
 
 ## Why this ticket exists
 

@@ -35,7 +35,7 @@ merge conflict and a broken contract:
 
 | File | Why it's frozen |
 |---|---|
-| `types.py` | The `Chunk` shape and `compute_text_hash` — every ticket imports these |
+| `models.py` | The `Chunk` shape and `compute_text_hash` — every ticket imports these |
 | `events.py` | The NDJSON event names — the Node UI and T09 both bind to them |
 | `config.json` | Every module reads its defaults from here |
 | `requirements.txt` | Two agents adding a dependency is a guaranteed conflict |

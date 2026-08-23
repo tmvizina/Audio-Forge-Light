@@ -1,8 +1,8 @@
 # T01 — Scaffold + frozen contracts
 
 **Depends on:** nothing. **Blocks:** every other ticket.
-**Read:** `BUILD-PROMPT.md` §2 (lines 60–108), §12 (lines 1031–1098), §3.6 (lines 258–275),
-and the event table in §11 (lines 1000–1020). **Do not read the rest yet.**
+**Read:** `BUILD-PROMPT.md` §2 (lines 60–109), §12 (lines 1075–1145), §3.6 (lines 259–276),
+and the event table in §11 (lines 1044–1074). **Do not read the rest yet.**
 
 ## Why this ticket exists
 
@@ -20,7 +20,7 @@ Create these and only these:
 
 ```
 narrator/
-  types.py              # frozen data shapes
+  models.py             # frozen data shapes (NOT types.py - shadows stdlib)
   events.py             # NDJSON emitter
   preflight.py          # ffmpeg/ffprobe presence check
   config.json
@@ -41,7 +41,7 @@ happen (see [ORCHESTRATION.md](ORCHESTRATION.md) §3):
   fake HTTP transport (so no test hits the network), an ffmpeg-generated audio fixture
   helper, and a temp-workspace fixture. Several tickets need these; only you may add them.
 - Your files become a **freeze list** the moment this ticket merges. No later ticket may
-  edit `types.py`, `events.py`, `config.json`, `requirements.txt`, `.env.example`,
+  edit `models.py`, `events.py`, `config.json`, `requirements.txt`, `.env.example`,
   `.gitignore`, or `tests/conftest.py` — they file a contract-change request instead.
   Design them to be complete, because changing them later costs a round trip across every
   in-flight branch.
@@ -62,7 +62,11 @@ from the very first commit. `.env` must never enter git history, so this cannot 
 later cleanup. Also ignore `out/`, `reference/*.wav`, `__pycache__/`, `node_modules/`,
 `*.pyc`.
 
-**2. `types.py` — the frozen chunk record.** A `Chunk` dataclass carrying exactly these
+**2. `models.py` — the frozen chunk record.** (Named `models.py`, **never** `types.py`:
+`narrator/` is on `sys.path`, so a root-level `types.py` shadows the stdlib `types`
+module process-wide and breaks `enum`, `re`, and `dataclasses` for the entire program.
+Never add a root module whose name collides with a stdlib module.)
+ A `Chunk` dataclass carrying exactly these
 fields, no more:
 
 | field | type | meaning |
@@ -155,7 +159,7 @@ spec; silence is a hand-built WAV header and everything else is ffmpeg.
 ## Definition of done
 
 ```bash
-python -c "from types import Chunk; print('ok')"   # from the narrator/ dir
+python -c "from models import Chunk; print('ok')"   # from the narrator/ dir
 pytest tests/ -v
 ```
 

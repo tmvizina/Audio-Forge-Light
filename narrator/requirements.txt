@@ -1,0 +1,14 @@
+# Core — kept deliberately light so this installs in seconds on a weak,
+# possibly offline-adjacent Windows box. No numpy, no torch, no soundfile:
+# silence generation is a hand-built WAV header and everything else is ffmpeg.
+msgpack
+httpx
+python-dotenv
+pydantic
+
+# Optional extras — only needed by the delivery-tag feature (§6), and only
+# for the backend you actually use. Each is imported lazily inside its
+# adapter module (tagger/claude.py, tagger/codex.py), never at module scope,
+# so the no-extras install still runs chunk/generate/stitch end to end.
+# anthropic   # --tagger claude
+# openai      # --tagger codex

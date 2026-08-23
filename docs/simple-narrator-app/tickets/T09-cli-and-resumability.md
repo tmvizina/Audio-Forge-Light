@@ -1,8 +1,8 @@
 # T09 — CLI wiring + resumability
 
 **Depends on:** T02–T08 **and T10–T12** (tagging is on by default). **Blocks:** T13, T14.
-**Read:** `BUILD-PROMPT.md` §9 (lines 822–849), §12 precedence (lines 1031–1098), and the
-NDJSON contract in §11 (lines 986–1030). **Nothing else** — the modules you are wiring
+**Read:** `BUILD-PROMPT.md` §9 (lines 866–893), §12 precedence (lines 1075–1145), the
+NDJSON contract in §11 (lines 1030–1074), and §6.0 auto-resolution (lines 544–575). **Nothing else** — the modules you are wiring
 already exist and their contracts are frozen.
 
 ## Why this ticket exists

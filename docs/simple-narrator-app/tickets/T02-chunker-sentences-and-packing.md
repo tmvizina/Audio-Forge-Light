@@ -1,7 +1,7 @@
 # T02 — Chunker: sentence splitting + greedy packing
 
 **Depends on:** T01. **Blocks:** T06, T07.
-**Read:** `BUILD-PROMPT.md` §3 intro and §3.1–3.2 (lines 109–211). **Nothing else.**
+**Read:** `BUILD-PROMPT.md` §3 intro and §3.1–3.2 (lines 110–212). **Nothing else.**
 
 ## Why this ticket exists
 

@@ -1,7 +1,7 @@
 # T10 — Tagger base contract + validator
 
 **Depends on:** T01. **Blocks:** T11, T12.
-**Read:** `BUILD-PROMPT.md` §6 intro, §6.1, §6.4, §6.5 (lines 526–559 and 643–693).
+**Read:** `BUILD-PROMPT.md` §6 intro + §6.0, §6.1 (lines 527–599), and §6.4–6.5 (lines 683–737).
 Skip §6.2 and §6.3 — those are the adapter tickets. **Nothing else.**
 
 ## Why this ticket exists

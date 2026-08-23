@@ -1,7 +1,7 @@
 # T05 — Adaptive concurrency pool
 
 **Depends on:** T01. **Blocks:** T09.
-**Read:** `BUILD-PROMPT.md` §8 (lines 724–821). **Nothing else.**
+**Read:** `BUILD-PROMPT.md` §8 (lines 768–865). **Nothing else.**
 
 ## Why this ticket exists
 

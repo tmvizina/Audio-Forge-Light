@@ -1,0 +1,14 @@
+# Secrets — must never enter git history
+.env
+
+# Python
+.venv/
+__pycache__/
+*.pyc
+
+# App output / user-supplied audio
+out/
+reference/*.wav
+
+# Node
+node_modules/

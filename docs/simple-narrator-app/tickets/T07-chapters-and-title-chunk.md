@@ -1,7 +1,7 @@
 # T07 — Chapter detection + the title chunk
 
 **Depends on:** T06. **Blocks:** T09.
-**Read:** `BUILD-PROMPT.md` §4 (lines 276–358). **Nothing else.**
+**Read:** `BUILD-PROMPT.md` §4 (lines 277–359). **Nothing else.**
 
 ## Why this ticket exists
 

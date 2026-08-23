@@ -1,7 +1,7 @@
 # T06 — Chunker: boundaries, merge, manifest fields
 
 **Depends on:** T02. **Blocks:** T07.
-**Read:** `BUILD-PROMPT.md` §3.3–3.6 (lines 212–275). **Nothing else.**
+**Read:** `BUILD-PROMPT.md` §3.3–3.6 (lines 213–276). **Nothing else.**
 
 ## Why this ticket exists
 

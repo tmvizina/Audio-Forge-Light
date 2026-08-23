@@ -1,7 +1,7 @@
 # T12 — Codex / OpenAI tagger adapter
 
 **Depends on:** T10. **Blocks:** T09.
-**Read:** `BUILD-PROMPT.md` §6.3 (lines 617–642). **Nothing else.**
+**Read:** `BUILD-PROMPT.md` §6.3 (lines 657–682). **Nothing else.**
 
 ## Why this ticket exists
 

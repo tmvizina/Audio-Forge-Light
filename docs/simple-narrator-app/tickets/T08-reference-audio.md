@@ -1,7 +1,7 @@
 # T08 — Reference audio + `prep-ref`
 
 **Depends on:** T01. **Blocks:** T09.
-**Read:** `BUILD-PROMPT.md` §7 (lines 694–723). **Nothing else.**
+**Read:** `BUILD-PROMPT.md` §7 (lines 738–767). **Nothing else.**
 
 ## Why this ticket exists
 
