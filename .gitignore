@@ -1,0 +1,19 @@
+# Secrets and local configuration
+narrator/.env
+
+# Local environments and dependencies
+narrator/.venv/
+narrator/venv/
+narrator/server/node_modules/
+__pycache__/
+*.py[cod]
+
+# User inputs, voice references, and generated audio
+narrator/input/
+narrator/reference/
+narrator/out/
+
+# Local test and tool state
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
